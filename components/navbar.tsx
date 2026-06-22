@@ -21,9 +21,6 @@ export function Navbar() {
           <Link href="/login" className="text-foreground hover:text-primary transition-colors">
             Login
           </Link>
-          <Link href="/register" className="text-foreground hover:text-primary transition-colors">
-            Register
-          </Link>
           <ThemeToggle />
         </div>
 

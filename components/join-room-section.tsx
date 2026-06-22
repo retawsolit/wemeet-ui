@@ -1,47 +1,70 @@
 "use client"
 
-import type React from "react"
-
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { ArrowRight } from "lucide-react"
+import { getJoinToken } from "@/lib/wemeet-api"
+import { useUser } from "@/hooks/useUser"
 
 export function JoinRoomSection() {
-  const router = useRouter()
+  const { user } = useUser()
   const [roomId, setRoomId] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState("")
 
-  const handleJoin = async (e: React.FormEvent) => {
+  const handleJoin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     setError("")
 
-    if (!roomId.trim()) {
+    const trimmedId = roomId.trim().toUpperCase()
+    if (!trimmedId) {
       setError("Please enter a room ID")
+      return
+    }
+
+    if (!user?.id) {
+      setError("Please login first")
       return
     }
 
     setIsLoading(true)
 
-    // Simulate delay
-    await new Promise((resolve) => setTimeout(resolve, 300))
+    try {
+      // Get user info from localStorage
+      const userName = localStorage.getItem("userName") || 
+                       localStorage.getItem("userEmail")?.split("@")[0] || 
+                       "User"
+      
+      // Get join token from WeMeet-server
+      const token = await getJoinToken(trimmedId, {
+        name: userName,
+        user_id: user.id,
+        is_admin: false,
+      })
 
-    const upperRoomId = roomId.toUpperCase()
-    // Store the room ID to check settings in the room page
-    sessionStorage.setItem("joining-room-id", upperRoomId)
-
-    router.push(`/room/${upperRoomId}?join=true`)
+      // Redirect to wemeet-client with access token
+      window.location.href = `/?access_token=${token}`
+    } catch (error) {
+      console.error("Error joining room:", error)
+      setError(error instanceof Error ? error.message : "Room not found or failed to join")
+      setIsLoading(false)
+    }
   }
 
   return (
     <div className="bg-card border border-border rounded-lg p-8 space-y-4">
       <div>
         <h3 className="text-xl font-semibold text-foreground mb-2">Join an Existing Room</h3>
-        <p className="text-muted-foreground text-sm mb-6">Enter a room ID to join an ongoing meeting</p>
+        <p className="text-muted-foreground text-sm mb-6">
+          Enter a room ID to join an ongoing meeting
+        </p>
       </div>
 
       <form onSubmit={handleJoin} className="space-y-4">
-        {error && <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">{error}</div>}
+        {error && (
+          <div className="p-3 bg-destructive/10 text-destructive rounded-lg text-sm">
+            {error}
+          </div>
+        )}
 
         <input
           type="text"

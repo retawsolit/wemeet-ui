@@ -1,9 +1,11 @@
 "use client"
 
 import { useState } from "react"
-import { useRouter } from "next/navigation"
 import { Plus } from "lucide-react"
 import { RoomSettingsModal } from "@/components/room-settings-modal"
+import { useUser } from "@/hooks/useUser"
+import { createWeMeetRoom, getJoinToken } from "@/lib/wemeet-api"
+import type { DashboardRoomSettings } from "@/lib/defaultRoomMetadata"
 
 interface RoomSettings {
   requirePassword: boolean
@@ -14,28 +16,50 @@ interface RoomSettings {
 }
 
 export function CreateRoomSection() {
-  const router = useRouter()
   const [isLoading, setIsLoading] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
+  const [newRoomId, setNewRoomId] = useState<string | null>(null)
+  const { user } = useUser()
 
   const handleCreateRoom = async () => {
+    const roomId = Math.random().toString(36).substring(2, 10).toUpperCase()
+    setNewRoomId(roomId)
     setShowSettings(true)
   }
 
   const handleSaveSettings = async (settings: RoomSettings) => {
+    if (!newRoomId || !user?.id) return
     setIsLoading(true)
-    // Generate a random room ID
-    const roomId = Math.random().toString(36).substring(2, 10).toUpperCase()
 
-    // Store room settings in sessionStorage (for demo purposes)
-    sessionStorage.setItem(`room-${roomId}`, JSON.stringify(settings))
-    sessionStorage.setItem(`room-${roomId}-host`, "true")
-    sessionStorage.setItem(`room-${roomId}-created-at`, new Date().toISOString())
+    try {
+      const roomTitle = `Meeting Room ${newRoomId}`
+      const dashboardSettings: DashboardRoomSettings = {
+        roomTitle,
+        waitingRoom: settings.waitingRoom,
+        muteOnEntry: settings.muteOnEntry,
+        allowGuests: settings.allowGuests,
+      }
+      await createWeMeetRoom(newRoomId, dashboardSettings)
 
-    // Simulate delay
-    await new Promise((resolve) => setTimeout(resolve, 300))
+      // Get user info from localStorage
+      const userName = localStorage.getItem("userName") || 
+                       localStorage.getItem("userEmail")?.split("@")[0] || 
+                       "User"
+      
+      // Get join token
+      const token = await getJoinToken(newRoomId, {
+        name: userName,
+        user_id: user.id,
+        is_admin: true, // Creator is admin
+      })
 
-    router.push(`/room/${roomId}`)
+      // Redirect to wemeet-client with access token
+      window.location.href = `/?access_token=${token}`
+    } catch (error) {
+      console.error("Error creating room:", error)
+      alert(error instanceof Error ? error.message : "Failed to create room")
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -61,7 +85,14 @@ export function CreateRoomSection() {
         </button>
       </div>
 
-      <RoomSettingsModal isOpen={showSettings} onSave={handleSaveSettings} onClose={() => setShowSettings(false)} />
+      {newRoomId && (
+        <RoomSettingsModal
+          isOpen={showSettings}
+          onSave={handleSaveSettings}
+          onClose={() => setShowSettings(false)}
+          roomId={newRoomId}
+        />
+      )}
     </>
   )
 }

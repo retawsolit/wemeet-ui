@@ -1,7 +1,9 @@
 "use client"
 
 import { X, Users, MessageSquare } from "lucide-react"
-import { useState } from "react"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { useSearchParams } from "next/navigation"
 
 interface MeetingSidebarProps {
   isOpen: boolean
@@ -14,12 +16,30 @@ export function MeetingSidebar({ isOpen, onClose, showChat }: MeetingSidebarProp
     { id: "1", name: "System", text: "Welcome to the meeting!" },
   ])
   const [newMessage, setNewMessage] = useState("")
+  const [participants, setParticipants] = useState<Array<{ id: string; name: string }>>([])
+  const searchParams = useSearchParams()
+  const roomId = searchParams.get("roomId")
 
-  const participants = [
-    { id: "1", name: "You" },
-    { id: "2", name: "John Doe" },
-    { id: "3", name: "Jane Smith" },
-  ]
+  // Fetch participants from Supabase
+  useEffect(() => {
+    const fetchParticipants = async () => {
+      if (!roomId) return
+      const { data, error } = await supabase
+        .from("room_participants")
+        .select("id, name")
+        .eq("room_id", roomId)
+
+      if (error) {
+        console.error("Error fetching participants:", error)
+      } else {
+        setParticipants(data || [])
+      }
+    }
+
+    if (!showChat) {
+      fetchParticipants()
+    }
+  }, [roomId, showChat])
 
   const handleSendMessage = () => {
     if (newMessage.trim()) {
@@ -96,7 +116,7 @@ export function MeetingSidebar({ isOpen, onClose, showChat }: MeetingSidebarProp
               placeholder="Type a message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === "Enter" && handleSendMessage()}
+              onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
               className="flex-1 px-3 py-2 bg-input border border-border rounded-lg text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/50"
             />
             <button

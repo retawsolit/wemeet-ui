@@ -1,9 +1,11 @@
-"use client"
 
-import type React from "react"
+"use client"
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
+import bcrypt from "bcryptjs"
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs"
+import type { Database } from "@/types/supabase"
 
 interface PasswordValidationProps {
   roomId: string
@@ -11,36 +13,41 @@ interface PasswordValidationProps {
   onPasswordValid: () => void
 }
 
+type Room = Database['public']['Tables']['rooms']['Row']
+
 export function PasswordValidation({ roomId, isOpen, onPasswordValid }: PasswordValidationProps) {
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
+  const supabase = createClientComponentClient<Database>()
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setIsLoading(true)
 
-    // Simulate validation delay
-    setTimeout(() => {
-      // Get stored room settings from sessionStorage
-      const roomSettings = sessionStorage.getItem(`room-${roomId}`)
-      if (!roomSettings) {
-        setError("Room not found")
-        setIsLoading(false)
-        return
-      }
+    const { data, error: fetchError } = await supabase
+      .from("rooms")
+      .select("password_hash")
+      .eq("id", roomId)
+      .single<Pick<Room, "password_hash">>()
 
-      const settings = JSON.parse(roomSettings)
-      if (settings.password === password) {
-        onPasswordValid()
-        sessionStorage.setItem(`room-${roomId}-user-password-valid`, "true")
-      } else {
-        setError("Invalid password")
-      }
+    if (fetchError || !data) {
+      setError("Room not found")
       setIsLoading(false)
-    }, 300)
+      return
+    }
+
+    const isValid = await bcrypt.compare(password, data.password_hash || "")
+    if (isValid) {
+      onPasswordValid()
+      sessionStorage.setItem(`room-${roomId}-user-password-valid`, "true")
+    } else {
+      setError("Invalid password")
+    }
+
+    setIsLoading(false)
   }
 
   if (!isOpen) return null

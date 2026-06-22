@@ -3,7 +3,6 @@
 import { DashboardNavbar } from "@/components/dashboard-navbar"
 import { CreateRoomSection } from "@/components/create-room-section"
 import { JoinRoomSection } from "@/components/join-room-section"
-import { MeetingHistory } from "@/components/meeting-history"
 import { useEffect } from "react"
 import { useRouter } from "next/navigation"
 
@@ -11,9 +10,10 @@ export default function DashboardPage() {
   const router = useRouter()
 
   useEffect(() => {
-    // Check if user is logged in
-    const userName = localStorage.getItem("userName")
-    if (!userName) {
+    // Check if user is logged in - check userId or userEmail (more reliable)
+    const userId = localStorage.getItem("userId")
+    const userEmail = localStorage.getItem("userEmail")
+    if (!userId && !userEmail) {
       router.push("/login")
     }
   }, [router])
@@ -37,15 +37,12 @@ export default function DashboardPage() {
             <JoinRoomSection />
           </div>
 
-          {/* Meeting History */}
-          <MeetingHistory />
-
           {/* Info Section */}
           <div className="bg-muted/30 border border-border rounded-lg p-6 text-center text-muted-foreground text-sm space-y-3 mt-12">
             <p>
               💡 <strong>Pro Tip:</strong> Share your room ID with others to invite them to your meeting.
             </p>
-            <p>🔒 All meetings are end-to-end encrypted for maximum privacy.</p>
+            <p>🔒 Your meetings are hosted privately for maximum data sovereignty.</p>
           </div>
         </div>
       </main>

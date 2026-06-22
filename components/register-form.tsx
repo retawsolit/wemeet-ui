@@ -47,7 +47,6 @@ export function RegisterForm() {
     setSuccess("Registration successful! Please check your email to confirm.")
     setIsLoading(false)
 
-    // Optionally redirect after short delay
     setTimeout(() => {
       router.push("/login")
     }, 2000)
@@ -123,11 +122,15 @@ export function RegisterForm() {
         {isLoading ? "Registering..." : "Register"}
       </button>
 
-      {/* Login Link */}
-      <p className="text-center text-sm text-muted-foreground">
-        Already have an account?{" "}
-        <Link href="/login" className="text-primary hover:underline font-semibold">Login</Link>
-      </p>
+      {/* Back to Home Link */}
+      <div className="text-center pt-2">
+         <Link 
+            href="/" 
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+         >
+            <span>←</span> Back to Home
+         </Link>
+      </div>
     </form>
   )
 }

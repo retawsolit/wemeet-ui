@@ -30,12 +30,15 @@ export function LoginForm() {
       return
     }
 
-    // Lấy thêm user profile nếu cần
-    // const { data: profile } = await supabase.from("profiles").select("*").eq("id", data.user.id).single()
-
-    // Lưu tên/email nếu cần dùng trong UI (hoặc dùng context/global state)
+    // Store user info in localStorage
     localStorage.setItem("userEmail", email)
     localStorage.setItem("userId", data.user.id)
+    // Set userName from email (before @) or use user metadata if available
+    const userName = data.user.user_metadata?.full_name || 
+                     data.user.user_metadata?.name || 
+                     email.split("@")[0] || 
+                     "User"
+    localStorage.setItem("userName", userName)
 
     router.push("/dashboard")
     setIsLoading(false)
@@ -100,14 +103,15 @@ export function LoginForm() {
       >
         {isLoading ? "Logging in..." : "Login"}
       </button>
-
-      {/* Register Link */}
-      <p className="text-center text-sm text-muted-foreground">
-        Don't have an account?{" "}
-        <Link href="/register" className="text-primary hover:underline font-semibold">
-          Register
-        </Link>
-      </p>
+      {/* Back to Home Link */}
+      <div className="text-center pt-2">
+         <Link 
+            href="/" 
+            className="text-sm text-muted-foreground hover:text-foreground transition-colors flex items-center justify-center gap-2"
+         >
+            <span>←</span> Back to Home
+         </Link>
+      </div>
     </form>
   )
 }

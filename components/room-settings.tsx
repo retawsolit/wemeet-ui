@@ -1,15 +1,27 @@
 "use client"
 
-import type React from "react"
-
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useEffect, useState } from "react"
+import { useParams } from "next/navigation"
+import bcrypt from "bcryptjs"
+import { supabase } from "@/lib/supabase"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Button } from "@/components/ui/button"
+import { toast } from "sonner"
 
 export function RoomSettings() {
+  const params = useParams()
+  const roomId = params?.id as string
+  const [isSaving, setIsSaving] = useState(false)
+
   const [settings, setSettings] = useState({
     roomPassword: false,
     password: "",
@@ -17,6 +29,33 @@ export function RoomSettings() {
     muteOnEntry: false,
     allowGuests: true,
   })
+
+  useEffect(() => {
+    const fetchRoomSettings = async () => {
+      if (!roomId) return
+
+      const { data, error } = await supabase
+        .from("rooms")
+        .select("password_hash, settings")
+        .eq("id", roomId)
+        .single()
+
+      if (error) {
+        console.error("Failed to fetch room settings:", error)
+        return
+      }
+
+      setSettings({
+        roomPassword: !!data.password_hash,
+        password: "",
+        waitingRoom: data.settings?.waiting_room || false,
+        muteOnEntry: data.settings?.mute_on_entry || false,
+        allowGuests: data.settings?.allow_guest ?? true,
+      })
+    }
+
+    fetchRoomSettings()
+  }, [roomId])
 
   const handleToggle = (key: keyof typeof settings) => {
     setSettings((prev) => ({
@@ -32,9 +71,41 @@ export function RoomSettings() {
     }))
   }
 
-  const handleSave = () => {
-    console.log("Room settings saved:", settings)
-    // TODO: Send to API
+  const handleSave = async () => {
+    if (!roomId) return
+    setIsSaving(true)
+
+    try {
+      const updates: any = {
+        updated_at: new Date().toISOString(),
+        settings: {
+          waiting_room: settings.waitingRoom,
+          mute_on_entry: settings.muteOnEntry,
+          allow_guest: settings.allowGuests,
+        },
+      }
+
+      if (settings.roomPassword && settings.password) {
+        updates.password_hash = await bcrypt.hash(settings.password, 12)
+      } else {
+        updates.password_hash = null
+      }
+
+      const { error } = await supabase.from("rooms").update(updates).eq("id", roomId)
+
+      if (error) {
+        toast.error("Failed to save room settings")
+        console.error("Supabase update error:", error)
+      } else {
+        toast.success("Room settings saved successfully")
+        setSettings((prev) => ({ ...prev, password: "" })) // clear plaintext
+      }
+    } catch (err) {
+      toast.error("An error occurred while saving")
+      console.error("Save error:", err)
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   return (
@@ -99,8 +170,12 @@ export function RoomSettings() {
           </div>
 
           {/* Save Button */}
-          <Button onClick={handleSave} className="w-full mt-6 bg-primary hover:bg-primary/90 text-white">
-            Save Settings
+          <Button
+            onClick={handleSave}
+            className="w-full mt-6 bg-primary hover:bg-primary/90 text-white"
+            disabled={isSaving}
+          >
+            {isSaving ? "Saving..." : "Save Settings"}
           </Button>
         </div>
       </CardContent>

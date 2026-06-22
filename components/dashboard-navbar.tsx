@@ -5,21 +5,45 @@ import { LogOut, User, Settings } from "lucide-react"
 import { useState, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { ThemeToggle } from "./theme-toggle"
+import { supabase } from "@/lib/supabase"
 
 export function DashboardNavbar() {
   const router = useRouter()
-  const [userName, setUserName] = useState("")
+  const [userName, setUserName] = useState("User")
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
-    const name = localStorage.getItem("userName") || "User"
-    setUserName(name)
+    // First try to get userName from localStorage (faster)
+    const storedUserName = localStorage.getItem("userName")
+    if (storedUserName) {
+      setUserName(storedUserName)
+      return
+    }
+
+    // Fallback: fetch from Supabase if not in localStorage
+    const fetchUser = async () => {
+      const { data: { user }, error } = await supabase.auth.getUser()
+      if (user?.email) {
+        const name = user.user_metadata?.full_name || 
+                     user.user_metadata?.name || 
+                     user.email.split("@")[0] || 
+                     "User"
+        setUserName(name)
+        localStorage.setItem("userName", name)
+      }
+    }
+
+    fetchUser()
   }, [])
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut()
+
     localStorage.removeItem("userName")
+    localStorage.removeItem("userId")
     localStorage.removeItem("userEmail")
-    router.push("/")
+
+    router.push("/") // quay lại trang chủ
   }
 
   return (

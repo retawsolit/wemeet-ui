@@ -1,9 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { X } from "lucide-react"
 import { Switch } from "@/components/ui/switch"
 import { Input } from "@/components/ui/input"
+import { supabase } from "@/lib/supabase"
+import bcrypt from "bcryptjs"
 
 interface RoomSettings {
   requirePassword: boolean
@@ -15,11 +17,12 @@ interface RoomSettings {
 
 interface RoomSettingsModalProps {
   isOpen: boolean
-  onSave: (settings: RoomSettings) => void
+  onSave?: (settings: RoomSettings) => void
   onClose: () => void
+  roomId: string
 }
 
-export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModalProps) {
+export function RoomSettingsModal({ isOpen, onSave, onClose, roomId }: RoomSettingsModalProps) {
   const [settings, setSettings] = useState<RoomSettings>({
     requirePassword: false,
     password: "",
@@ -28,8 +31,59 @@ export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModal
     allowGuests: true,
   })
 
-  const handleSave = () => {
-    onSave(settings)
+  useEffect(() => {
+    if (isOpen && roomId) {
+      const fetchSettings = async () => {
+        const { data: roomData } = await supabase
+          .from("rooms")
+          .select("is_public")
+          .eq("id", roomId)
+          .single()
+
+        const { data: roomSettingsData } = await supabase
+          .from("room_settings")
+          .select("*")
+          .eq("room_id", roomId)
+          .single()
+
+        if (roomData && roomSettingsData) {
+          setSettings({
+            requirePassword: !roomData.is_public,
+            password: "",
+            waitingRoom: roomSettingsData.waiting_room,
+            muteOnEntry: roomSettingsData.mute_on_entry,
+            allowGuests: roomSettingsData.allow_guests,
+          })
+        }
+      }
+
+      fetchSettings()
+    }
+  }, [isOpen, roomId])
+
+  const handleSave = async () => {
+    if (settings.requirePassword && settings.password.trim() !== "") {
+      const passwordHash = await bcrypt.hash(settings.password, 10)
+
+      await supabase
+        .from("rooms")
+        .update({ is_public: false, password_hash: passwordHash })
+        .eq("id", roomId)
+    } else {
+      await supabase
+        .from("rooms")
+        .update({ is_public: true, password_hash: null })
+        .eq("id", roomId)
+    }
+
+    await supabase.from("room_settings").upsert({
+      room_id: roomId,
+      waiting_room: settings.waitingRoom,
+      mute_on_entry: settings.muteOnEntry,
+      allow_guests: settings.allowGuests,
+    })
+
+    onSave?.(settings)
     onClose()
   }
 
@@ -54,7 +108,9 @@ export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModal
               <label className="text-sm font-medium text-foreground">Require Room Password</label>
               <Switch
                 checked={settings.requirePassword}
-                onCheckedChange={(checked) => setSettings({ ...settings, requirePassword: checked })}
+                onCheckedChange={(checked) =>
+                  setSettings({ ...settings, requirePassword: checked })
+                }
               />
             </div>
             {settings.requirePassword && (
@@ -62,13 +118,15 @@ export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModal
                 type="password"
                 placeholder="Enter room password"
                 value={settings.password}
-                onChange={(e) => setSettings({ ...settings, password: e.target.value })}
+                onChange={(e) =>
+                  setSettings({ ...settings, password: e.target.value })
+                }
                 className="w-full"
               />
             )}
           </div>
 
-          {/* Waiting Room Setting */}
+          {/* Waiting Room */}
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-foreground block">Waiting Room</label>
@@ -76,11 +134,13 @@ export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModal
             </div>
             <Switch
               checked={settings.waitingRoom}
-              onCheckedChange={(checked) => setSettings({ ...settings, waitingRoom: checked })}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, waitingRoom: checked })
+              }
             />
           </div>
 
-          {/* Mute on Entry Setting */}
+          {/* Mute on Entry */}
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-foreground block">Mute on Entry</label>
@@ -88,11 +148,13 @@ export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModal
             </div>
             <Switch
               checked={settings.muteOnEntry}
-              onCheckedChange={(checked) => setSettings({ ...settings, muteOnEntry: checked })}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, muteOnEntry: checked })
+              }
             />
           </div>
 
-          {/* Allow Guests Setting */}
+          {/* Allow Guests */}
           <div className="flex items-center justify-between">
             <div>
               <label className="text-sm font-medium text-foreground block">Allow Guest Users</label>
@@ -100,7 +162,9 @@ export function RoomSettingsModal({ isOpen, onSave, onClose }: RoomSettingsModal
             </div>
             <Switch
               checked={settings.allowGuests}
-              onCheckedChange={(checked) => setSettings({ ...settings, allowGuests: checked })}
+              onCheckedChange={(checked) =>
+                setSettings({ ...settings, allowGuests: checked })
+              }
             />
           </div>
         </div>
